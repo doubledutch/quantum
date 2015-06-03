@@ -2,8 +2,8 @@ package inmemory
 
 import (
 	"errors"
-	"log"
 
+	"github.com/doubledutch/lager"
 	"github.com/doubledutch/quantum"
 )
 
@@ -13,34 +13,39 @@ var (
 )
 
 // NewRegistry creates a Router, initializing the job map.
-func NewRegistry() quantum.Registry {
+func NewRegistry(lgr lager.Lager) quantum.Registry {
 	return &Registry{
+		lgr:  lgr,
 		jobs: make(map[string]quantum.Job),
 	}
 }
 
 // Registry stores jobs in a map
 type Registry struct {
+	lgr lager.Lager
+
 	jobs map[string]quantum.Job
 }
 
 // Add registers a job with the Registry
 func (r *Registry) Add(job quantum.Job) {
+	r.lgr.Debugf("Adding job: %s\n", job)
 	r.jobs[job.Type()] = job
 }
 
 // Get returns the Job corresponding to the Request.
 // If no such job exists, an error is returned.
 func (r *Registry) Get(request quantum.Request) (quantum.Job, error) {
-	log.Printf("attempting job with type: %v\n", request.Type)
+	r.lgr.Infof("attempting job with type: %v\n", request.Type)
 	job, ok := r.jobs[request.Type]
 	if !ok {
-		log.Printf("job not found with type: %v", request.Type)
+		r.lgr.Errorf("job not found with type: %v", request.Type)
 		return nil, ErrJobNotFound
 	}
 
 	err := job.Configure(request.Data)
 	if err != nil {
+		r.lgr.Errorf("job configure error: type: %s, data: %s", request.Type, request.Data)
 		return nil, err
 	}
 

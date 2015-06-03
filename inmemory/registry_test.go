@@ -4,6 +4,7 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/doubledutch/lager"
 	"github.com/doubledutch/quantum"
 )
 
@@ -32,7 +33,7 @@ func (j *testRegistryJob) Run(conn quantum.AgentConn) error {
 }
 
 func TestAgentRouterGet(t *testing.T) {
-	r := NewRegistry()
+	r := NewRegistry(lager.NewLogLager(nil))
 
 	job := &testRegistryJob{}
 	r.Add(job)
@@ -51,7 +52,7 @@ func TestAgentRouterGet(t *testing.T) {
 }
 
 func TestAgentRouterGetErr(t *testing.T) {
-	r := NewRegistry()
+	r := NewRegistry(lager.NewLogLager(nil))
 
 	request := quantum.Request{
 		Type: registryJob,
@@ -64,7 +65,7 @@ func TestAgentRouterGetErr(t *testing.T) {
 }
 
 func TestNewInMemoryRegistryGetErr(t *testing.T) {
-	r := NewRegistry()
+	r := NewRegistry(lager.NewLogLager(nil))
 
 	job := &testRegistryJob{}
 	r.Add(job)
