@@ -87,7 +87,6 @@ func New(config *Config) quantum.Agent {
 func (a *Agent) Accept(ln net.Listener) error {
 	netConn, err := ln.Accept()
 	if err != nil {
-		a.Lager.Errorf("Error net connection: %s", err)
 		return err
 	}
 
