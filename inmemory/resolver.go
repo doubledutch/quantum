@@ -9,7 +9,7 @@ import (
 
 // ClientResolverConfig defines
 type ClientResolverConfig struct {
-	Config      *quantum.Config
+	*quantum.ConnConfig
 	Registrator *Registrator
 }
 
@@ -20,16 +20,16 @@ type ClientResolver struct {
 }
 
 // NewClientResolver creates a new ClientResolver using a Registrator.
-func NewClientResolver(config ClientResolverConfig) (quantum.ClientResolver, error) {
-	client := client.New(config.Config)
+func NewClientResolver(config *quantum.ConnConfig, r *Registrator) (quantum.ClientResolver, error) {
+	client := client.New(config)
 
-	if config.Registrator == nil {
+	if r == nil {
 		return nil, errors.New("Registrator required")
 	}
 
 	return &ClientResolver{
 		client:      client,
-		registrator: config.Registrator,
+		registrator: r,
 	}, nil
 }
 

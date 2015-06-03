@@ -27,7 +27,7 @@ func NewClientResolver(config quantum.ClientResolverConfig) quantum.ClientResolv
 
 // ClientResolver is a client resolver that leverages Consul's service discovery.
 type ClientResolver struct {
-	config *quantum.Config
+	config *quantum.ConnConfig
 	lgr    lager.Lager
 	server string
 }

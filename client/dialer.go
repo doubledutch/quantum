@@ -9,17 +9,13 @@ import (
 
 // Client sends requests to Server and reads the response
 type Client struct {
-	config *quantum.Config
+	*quantum.ConnConfig
 }
 
 // New returns a new Client with the specified host and port
-func New(config *quantum.Config) quantum.Client {
-	if config == nil {
-		config = quantum.DefaultConfig()
-	}
-
+func New(config *quantum.ConnConfig) quantum.Client {
 	return &Client{
-		config: config,
+		ConnConfig: config,
 	}
 }
 
@@ -30,7 +26,7 @@ func (c *Client) Dial(address string) (quantum.ClientConn, error) {
 		return nil, fmt.Errorf("dial err: %s", err)
 	}
 
-	conn, err := NewConn(netConn, c.config)
+	conn, err := NewConn(netConn, c.ConnConfig)
 
 	return conn, err
 }

@@ -14,7 +14,6 @@ import (
 	"github.com/doubledutch/quantum/inmemory"
 
 	"github.com/doubledutch/lager"
-	"github.com/doubledutch/mux"
 	"github.com/doubledutch/mux/gob"
 )
 
@@ -25,9 +24,7 @@ var (
 
 // Config encapsulates configuration for an agent
 type Config struct {
-	Pool    mux.Pool
-	Lager   lager.Lager
-	Timeout time.Duration
+	*quantum.ConnConfig
 
 	Port string
 
@@ -37,10 +34,7 @@ type Config struct {
 
 // Agent routes job requests to jobs, and runs the jobs with the request
 type Agent struct {
-	pool mux.Pool
-	lgr  lager.Lager
-
-	timeout time.Duration
+	*quantum.ConnConfig
 
 	port  string
 	done  chan struct{}
@@ -78,9 +72,7 @@ func New(config *Config) quantum.Agent {
 	fmt.Println(config)
 
 	return &Agent{
-		pool:    config.Pool,
-		lgr:     config.Lager,
-		timeout: config.Timeout,
+		ConnConfig: config.ConnConfig,
 
 		Registry:    config.Registry,
 		registrator: config.Registrator,
@@ -95,17 +87,13 @@ func New(config *Config) quantum.Agent {
 func (a *Agent) Accept(ln net.Listener) error {
 	netConn, err := ln.Accept()
 	if err != nil {
-		a.lgr.Errorf("Error net connection: %s", err)
+		a.Lager.Errorf("Error net connection: %s", err)
 		return err
 	}
 
-	conn, err := NewConn(netConn, &connConfig{
-		Timeout: a.timeout,
-		Lager:   a.lgr,
-		Pool:    a.pool,
-	})
+	conn, err := NewConn(netConn, a.ConnConfig)
 	if err != nil {
-		a.lgr.Errorf("Error creating agent conn: %s", err)
+		a.Lager.Errorf("Error creating agent conn: %s", err)
 		return err
 	}
 
@@ -145,15 +133,15 @@ func (a *Agent) Start() error {
 		}
 	}()
 
-	a.lgr.Debugf("Registering")
+	a.Lager.Debugf("Registering")
 	if err := a.registrator.Register(NewPort(a.port).Int(), a); err != nil {
-		a.lgr.Errorf("Failed to announce services: %s\n", err)
+		a.Lager.Errorf("Failed to announce services: %s\n", err)
 		return err
 	}
 
 	// Blocks
-	a.lgr.Debugf("ListenAndServe block")
-	return quantum.ListenAndServe(a, a.port, a.lgr)
+	a.Lager.Debugf("ListenAndServe block")
+	return quantum.ListenAndServe(a, a.port, a.Lager)
 }
 
 // Port holds a port in the form :XXXX

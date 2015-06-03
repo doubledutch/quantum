@@ -15,20 +15,17 @@ type Conn struct {
 
 	lgr lager.Lager
 
-	LogCh chan string
-	SigCh chan os.Signal
+	logCh chan string
+	sigCh chan os.Signal
 }
 
 // NewConn returns a new Connection connected to the specified io.ReadWriter
-func NewConn(conn net.Conn, config *quantum.Config) (*Conn, error) {
-	muxConfig := mux.DefaultConfig()
+func NewConn(conn net.Conn, config *quantum.ConnConfig) (quantum.ClientConn, error) {
 	if config == nil {
-		config = quantum.DefaultConfig()
+		config = quantum.DefaultConnConfig()
 	}
 
-	muxConfig.Lager = config.Lager
-
-	client, err := config.Pool.NewClient(conn, muxConfig)
+	client, err := config.Pool.NewClient(conn, config.ToMux())
 
 	if err != nil {
 		return nil, err
@@ -36,29 +33,27 @@ func NewConn(conn net.Conn, config *quantum.Config) (*Conn, error) {
 	cc := &Conn{
 		Client: client,
 		lgr:    config.Lager,
-		LogCh:  make(chan string, 1),
-		SigCh:  make(chan os.Signal, 1),
+		logCh:  make(chan string, 1),
+		sigCh:  make(chan os.Signal, 1),
 	}
 
 	// Send up receiver for logs
-	logR := cc.Pool().NewReceiver(cc.LogCh)
+	logR := cc.Pool().NewReceiver(cc.logCh)
 	client.Receive(mux.LogType, logR)
 
 	go client.Recv()
-
-	config.Lager.Debugf("Connection initialized")
 
 	return cc, nil
 }
 
 // Logs provides the logs that the client receives
 func (c *Conn) Logs() <-chan string {
-	return c.LogCh
+	return c.logCh
 }
 
 // Signals provides a way to send signals to the other end
 func (c *Conn) Signals() chan<- os.Signal {
-	return c.SigCh
+	return c.sigCh
 }
 
 // Run sends the Request to the server on the other send
@@ -74,7 +69,7 @@ func (c *Conn) Run(request quantum.Request) error {
 	go func() {
 		// Listen for signal, if occurs, send it to server
 		for {
-			sig := <-c.SigCh
+			sig := <-c.sigCh
 			if sig != nil {
 				c.Send(mux.SignalType, sig)
 			} else {
@@ -92,6 +87,6 @@ func (c *Conn) Run(request quantum.Request) error {
 // Close closes ClientConn
 func (c *Conn) Close() error {
 	// We need to close senders, receivers are closed by mux.Client
-	close(c.SigCh)
+	close(c.sigCh)
 	return nil
 }

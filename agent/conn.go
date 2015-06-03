@@ -5,7 +5,6 @@ import (
 	"net"
 	"os"
 	"runtime/debug"
-	"time"
 
 	"github.com/doubledutch/lager"
 	"github.com/doubledutch/mux"
@@ -26,24 +25,13 @@ type Conn struct {
 	lgr lager.Lager
 }
 
-type connConfig struct {
-	Timeout time.Duration
-	Pool    mux.Pool
-	Lager   lager.Lager
-}
-
 // NewConn returns a new Connection connected to the specified io.ReadWriter
-func NewConn(conn net.Conn, config *connConfig) (*Conn, error) {
-	muxConfig := new(mux.Config)
-	// TODO: Verify not null
-	if config != nil {
-		muxConfig.Lager = config.Lager
-		muxConfig.Timeout = config.Timeout
-	} else {
-		muxConfig = mux.DefaultConfig()
+func NewConn(conn net.Conn, config *quantum.ConnConfig) (*Conn, error) {
+	if config == nil {
+		config = quantum.DefaultConnConfig()
 	}
 
-	srv, err := config.Pool.NewServer(conn, muxConfig)
+	srv, err := config.Pool.NewServer(conn, config.ToMux())
 	if err != nil {
 		return nil, err
 	}

@@ -2,6 +2,7 @@ package quantum
 
 import (
 	"errors"
+	"time"
 
 	"github.com/doubledutch/lager"
 	"github.com/doubledutch/mux"
@@ -39,5 +40,31 @@ func DefaultConfig() *Config {
 	return &Config{
 		Lager: lager.NewLogLager(nil),
 		Pool:  new(gob.Pool),
+	}
+}
+
+// ConnConfig are configuration settings needed for Conn
+type ConnConfig struct {
+	Timeout time.Duration
+	*Config
+}
+
+// DefaultConnConfig is the default ConnConfig
+func DefaultConnConfig() *ConnConfig {
+	return &ConnConfig{
+		Timeout: 100 * time.Millisecond,
+		Config:  DefaultConfig(),
+	}
+}
+
+// ToMux creates a mux.Config from ConnConfig
+func (c *ConnConfig) ToMux() *mux.Config {
+	if c == nil {
+		return mux.DefaultConfig()
+	}
+
+	return &mux.Config{
+		Timeout: c.Timeout,
+		Lager:   c.Lager,
 	}
 }
