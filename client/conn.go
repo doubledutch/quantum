@@ -4,13 +4,16 @@ import (
 	"net"
 	"os"
 
-	"github.com/doubledutch/quantum"
+	"github.com/doubledutch/lager"
 	"github.com/doubledutch/mux"
+	"github.com/doubledutch/quantum"
 )
 
 // Conn wraps a Connection
 type Conn struct {
 	mux.Client
+
+	lgr lager.Lager
 
 	LogCh chan string
 	SigCh chan os.Signal
@@ -32,6 +35,7 @@ func NewConn(conn net.Conn, config *quantum.Config) (*Conn, error) {
 	}
 	cc := &Conn{
 		Client: client,
+		lgr:    config.Lager,
 		LogCh:  make(chan string, 1),
 		SigCh:  make(chan os.Signal, 1),
 	}
@@ -41,6 +45,8 @@ func NewConn(conn net.Conn, config *quantum.Config) (*Conn, error) {
 	client.Receive(mux.LogType, logR)
 
 	go client.Recv()
+
+	config.Lager.Debugf("Connection initialized")
 
 	return cc, nil
 }
@@ -59,7 +65,9 @@ func (c *Conn) Signals() chan<- os.Signal {
 // and waits for the response.
 func (c *Conn) Run(request quantum.Request) error {
 	// Use type of request data to create a requester
+	c.lgr.Debugf("Sending request: %s", request)
 	if err := c.Send(quantum.RequestType, request); err != nil {
+		c.lgr.Errorf("Error sending request: %s", request)
 		return err
 	}
 
@@ -75,6 +83,7 @@ func (c *Conn) Run(request quantum.Request) error {
 		}
 	}()
 
+	c.lgr.Debugf("Waiting")
 	err := c.Wait()
 	c.Close()
 	return err

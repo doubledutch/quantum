@@ -4,10 +4,12 @@ import (
 	"errors"
 	"log"
 	"net"
+	"os"
 	"strconv"
 	"sync"
 	"testing"
 
+	"github.com/doubledutch/lager"
 	"github.com/doubledutch/quantum"
 	"github.com/doubledutch/quantum/agent"
 	"github.com/doubledutch/quantum/client"
@@ -83,13 +85,18 @@ func TestClientAgent(t *testing.T) {
 	port := ":0"
 	agent := agent.New(&agent.Config{
 		Port: port,
+		Lager: lager.NewLogLager(&lager.LogConfig{
+			Levels: lager.LevelsFromString("DIE"),
+			Output: os.Stdout,
+		}),
 	})
-	agent.Add(&testAgentJob{})
+	agent.Add(new(testAgentJob))
 
 	l, agentAddr := listenTCP()
 	go func() {
 		if err := agent.Accept(l); err != nil {
 			t.Fatal(err)
+			t.FailNow()
 		}
 	}()
 

@@ -4,9 +4,9 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/doubledutch/lager"
 	"github.com/doubledutch/quantum"
 	"github.com/doubledutch/quantum/client"
-	"github.com/doubledutch/lager"
 	"github.com/miekg/dns"
 )
 
@@ -90,9 +90,7 @@ func (cr *ClientResolver) resolveClient(results []resolveResult) (conn quantum.C
 	err = quantum.ErrNoAgents
 	// TODO: Do this concurrently
 	for _, result := range results {
-		client := client.New(&client.Config{
-			Config: cr.config,
-		})
+		client := client.New(cr.config)
 		conn, err = client.Dial(result.address)
 		if err != nil {
 			break

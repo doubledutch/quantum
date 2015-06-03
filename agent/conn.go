@@ -2,10 +2,10 @@ package agent
 
 import (
 	"errors"
-	"log"
 	"net"
 	"os"
 	"runtime/debug"
+	"time"
 
 	"github.com/doubledutch/lager"
 	"github.com/doubledutch/mux"
@@ -26,14 +26,23 @@ type Conn struct {
 	lgr lager.Lager
 }
 
+type connConfig struct {
+	Timeout time.Duration
+	Pool    mux.Pool
+	Lager   lager.Lager
+}
+
 // NewConn returns a new Connection connected to the specified io.ReadWriter
-func NewConn(conn net.Conn, config *quantum.Config) (*Conn, error) {
-	muxConfig := mux.DefaultConfig()
-	if config == nil {
-		config = quantum.DefaultConfig()
+func NewConn(conn net.Conn, config *connConfig) (*Conn, error) {
+	muxConfig := new(mux.Config)
+	// TODO: Verify not null
+	if config != nil {
+		muxConfig.Lager = config.Lager
+		muxConfig.Timeout = config.Timeout
+	} else {
+		muxConfig = mux.DefaultConfig()
 	}
 
-	muxConfig.Lager = config.Lager
 	srv, err := config.Pool.NewServer(conn, muxConfig)
 	if err != nil {
 		return nil, err
@@ -85,7 +94,7 @@ func (conn *Conn) serve(reg quantum.Registry) (err error) {
 
 	defer func() {
 		if r := recover(); r != nil {
-			log.Printf("job err: %s\n%s", r, debug.Stack())
+			conn.lgr.Errorf("job err: %s\n%s", r, debug.Stack())
 			err = ErrUnexpectedError
 		}
 	}()
@@ -94,10 +103,12 @@ func (conn *Conn) serve(reg quantum.Registry) (err error) {
 
 	job, err := reg.Get(request)
 	if err != nil {
+		conn.lgr.Errorf("Error getting job: %s\n", err)
 		return
 	}
 
+	conn.lgr.Debugf("running job: %s", err)
 	err = job.Run(conn)
-	conn.lgr.Infof("job completed: %s\n", err)
+	conn.lgr.Infof("job completed: %s", err)
 	return
 }

@@ -1,6 +1,9 @@
 package defaults
 
 import (
+	"os"
+
+	"github.com/doubledutch/lager"
 	"github.com/doubledutch/quantum"
 	"github.com/doubledutch/quantum/consul"
 	"github.com/doubledutch/quantum/inmemory"
@@ -11,7 +14,15 @@ func NewClientResolver(config quantum.ClientResolverConfig) quantum.ClientResolv
 	return consul.NewClientResolver(config)
 }
 
-// NewRegistry returns the default registry
+// NewRegistry returns a default registry
 func NewRegistry() quantum.Registry {
-	return inmemory.NewRegistry()
+	return inmemory.NewRegistry(NewLager())
+}
+
+// NewLager returns a default Lager
+func NewLager() lager.Lager {
+	return lager.NewLogLager(&lager.LogConfig{
+		Levels: lager.LevelsFromString("IE"),
+		Output: os.Stdout,
+	})
 }
