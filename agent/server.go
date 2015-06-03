@@ -2,7 +2,6 @@ package agent
 
 import (
 	"errors"
-	"fmt"
 	"net"
 	"os"
 	"os/signal"
@@ -68,8 +67,6 @@ func New(config *Config) quantum.Agent {
 	if config.Timeout == 0 {
 		config.Timeout = 100 * time.Millisecond
 	}
-
-	fmt.Println(config)
 
 	return &Agent{
 		ConnConfig: config.ConnConfig,
