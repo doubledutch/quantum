@@ -9,7 +9,7 @@ import (
 	"github.com/doubledutch/quantum"
 )
 
-// Conn wraps a Connection
+// Conn implements quantum.ClientConn
 type Conn struct {
 	mux.Client
 

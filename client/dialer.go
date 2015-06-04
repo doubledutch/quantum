@@ -1,8 +1,8 @@
 package client
 
 import (
-	"fmt"
 	"net"
+	"time"
 
 	"github.com/doubledutch/quantum"
 )
@@ -19,14 +19,23 @@ func New(config *quantum.ConnConfig) quantum.Client {
 	}
 }
 
-// Dial connects to the ClientConfig.addr and returns ClientConn
+// Dial connects to the address and returns quantum.ClientConn
 func (c *Client) Dial(address string) (quantum.ClientConn, error) {
 	netConn, err := net.Dial("tcp", address)
 	if err != nil {
-		return nil, fmt.Errorf("dial err: %s", err)
+		return nil, err
 	}
 
-	conn, err := NewConn(netConn, c.ConnConfig)
+	return NewConn(netConn, c.ConnConfig)
+}
 
-	return conn, err
+// DialTimeout connects to the address and returns quantum.ClientConn, timing out
+// after time
+func (c *Client) DialTimeout(address string, time time.Duration) (quantum.ClientConn, error) {
+	netConn, err := net.DialTimeout("tcp", address, time)
+	if err != nil {
+		return nil, err
+	}
+
+	return NewConn(netConn, c.ConnConfig)
 }
