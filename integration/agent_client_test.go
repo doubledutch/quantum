@@ -1,7 +1,6 @@
 package integration
 
 import (
-	"errors"
 	"log"
 	"net"
 	"os"
@@ -60,12 +59,6 @@ func (s AddStep) Run(state quantum.StateBag) error {
 }
 
 func (s AddStep) Cleanup(state quantum.StateBag) {}
-
-type ErrorStep struct{}
-
-func (s ErrorStep) Run(state quantum.StateBag) error {
-	return errors.New("error")
-}
 
 func (j *testAgentJob) Steps() []quantum.Step {
 	return []quantum.Step{
@@ -135,63 +128,3 @@ func TestClientAgent(t *testing.T) {
 	}
 	wg.Wait()
 }
-
-/*
-func TestClientAgentServer(t *testing.T) {
-	server := NewServer()
-	ls, serverAddr := listenTCP()
-	go func() {
-		// Register agent record
-		if err := server.Accept(ls); err != nil {
-			t.Fatal(err)
-			t.FailNow()
-		}
-		// ClientResolve
-		if err := server.Accept(ls); err != nil {
-			t.Fatal(err)
-			t.FailNow()
-		}
-	}()
-
-	la, agentAddr := listenTCP()
-	parts := strings.Split(agentAddr, ":")
-	agent := NewAgent(":" + parts[1])
-	agent.Register(&testAgentJob{})
-	go func() {
-		if err := agent.Accept(la); err != nil {
-			t.Fatal(err)
-		}
-	}()
-
-	if err := agent.Announce(serverAddr); err != nil {
-		t.Fatal(err)
-		t.FailNow()
-	}
-
-	cr := NewClientResolver()
-	configs, err := cr.Resolve(serverAddr, "test", serverJob, "{}")
-	if err != nil {
-		t.Fatal(err)
-		t.FailNow()
-	}
-
-	outCh := make(chan string)
-	sigCh := make(chan os.Signal)
-	defer close(sigCh)
-
-	var wg sync.WaitGroup
-	wg.Add(1)
-	go func() {
-		for _ = range outCh {
-			// Consume the channel
-		}
-		wg.Done()
-	}()
-
-	if err := cr.RunWith(configs, outCh, sigCh); err != nil {
-		t.Fatal(err)
-		t.FailNow()
-	}
-	close(outCh)
-	wg.Wait()
-}*/
