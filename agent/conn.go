@@ -46,7 +46,7 @@ func NewConn(conn net.Conn, config *quantum.ConnConfig) (*Conn, error) {
 	}
 
 	// Send up receiver for signals
-	sigR := ac.Pool().NewReceiver(ac.SigCh)
+	sigR := mux.NewSignalReceiver(ac.SigCh, config.Pool)
 	srv.Receive(mux.SignalType, sigR)
 
 	requestR := quantum.NewRequestReceiver(ac.RequestCh)
@@ -65,6 +65,12 @@ func (conn *Conn) Signals() chan os.Signal {
 // Logs returns the logs channel of the connection
 func (conn *Conn) Logs() chan string {
 	return conn.OutCh
+}
+
+// Lager returns the Lager of the connection, allowing jobs
+// to log to the agent
+func (conn *Conn) Lager() lager.Lager {
+	return conn.lgr
 }
 
 // Serve processes a connection and serves the response

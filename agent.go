@@ -3,6 +3,7 @@ package quantum
 import (
 	"os"
 
+	"github.com/doubledutch/lager"
 	"github.com/doubledutch/mux"
 )
 
@@ -18,4 +19,5 @@ type AgentConn interface {
 	mux.Server
 	Logs() chan string
 	Signals() chan os.Signal
+	Lager() lager.Lager
 }
