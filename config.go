@@ -16,7 +16,7 @@ var (
 	ErrInvalidPool = errors.New("Invalid Config Pool")
 )
 
-// Config represents configuration for a quantum component
+// Config represents components required by all quantum components
 type Config struct {
 	Lager lager.Lager
 	Pool  mux.Pool

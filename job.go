@@ -92,6 +92,7 @@ func (basic *BasicJob) Run(conn AgentConn) error {
 
 	state := NewStateBag()
 	state.Put("conn", conn)
+	state.Put("ui", NewUI(conn))
 	state.Put("runner", NewBasicRunner())
 
 	runner := &BasicExecutor{Steps: basic.job.Steps()}
