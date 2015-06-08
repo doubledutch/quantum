@@ -1,6 +1,7 @@
 package quantum
 
 import (
+	"encoding/json"
 	"errors"
 	"sync"
 
@@ -34,6 +35,16 @@ func NewRequest(rt, rd string) Request {
 // Routable defines an interface for routing an object
 type Routable interface {
 	Type() string
+}
+
+// RoutableRequest creates a Request
+func RoutableRequest(r Routable) Request {
+	b, _ := json.Marshal(r)
+
+	return Request{
+		Type: r.Type(),
+		Data: b,
+	}
 }
 
 // Job is executed by Quantum
@@ -81,6 +92,7 @@ func (basic *BasicJob) Run(conn AgentConn) error {
 
 	state := NewStateBag()
 	state.Put("conn", conn)
+	state.Put("ui", NewUI(conn))
 	state.Put("runner", NewBasicRunner())
 
 	runner := &BasicExecutor{Steps: basic.job.Steps()}

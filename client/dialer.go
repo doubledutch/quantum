@@ -1,50 +1,41 @@
 package client
 
 import (
-	"fmt"
 	"net"
+	"time"
 
 	"github.com/doubledutch/quantum"
 )
 
-// Config contains info for running the client
-type Config struct {
-	// TODO: This naming sucks...
-	Config *quantum.Config
-}
-
-// DefaultClientConfig is the default client config
-func DefaultClientConfig() *Config {
-	return &Config{
-		Config: quantum.DefaultConfig(),
-	}
-}
-
 // Client sends requests to Server and reads the response
 type Client struct {
-	config *quantum.Config
+	*quantum.ConnConfig
 }
 
 // New returns a new Client with the specified host and port
-func New(config *Config) quantum.Client {
-	if config == nil {
-		config = DefaultClientConfig()
-	} else if config.Config == nil {
-		config.Config = quantum.DefaultConfig()
-	}
+func New(config *quantum.ConnConfig) quantum.Client {
 	return &Client{
-		config: config.Config,
+		ConnConfig: config,
 	}
 }
 
-// Dial connects to the ClientConfig.addr and returns ClientConn
+// Dial connects to the address and returns quantum.ClientConn
 func (c *Client) Dial(address string) (quantum.ClientConn, error) {
 	netConn, err := net.Dial("tcp", address)
 	if err != nil {
-		return nil, fmt.Errorf("dial err: %s", err)
+		return nil, err
 	}
 
-	conn, err := NewConn(netConn, c.config)
+	return NewConn(netConn, c.ConnConfig)
+}
 
-	return conn, err
+// DialTimeout connects to the address and returns quantum.ClientConn, timing out
+// after time
+func (c *Client) DialTimeout(address string, time time.Duration) (quantum.ClientConn, error) {
+	netConn, err := net.DialTimeout("tcp", address, time)
+	if err != nil {
+		return nil, err
+	}
+
+	return NewConn(netConn, c.ConnConfig)
 }

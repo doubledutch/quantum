@@ -27,3 +27,21 @@ type ClientResolverConfig struct {
 	Config *Config
 	Server string
 }
+
+// MultiClientResolver implements ClientResolver by trying to resolve a client
+// be iterating through provided ClientResolvers.
+type MultiClientResolver struct {
+	Resolvers []ClientResolver
+}
+
+// Resolve resolves a ResolveRequest by iterating through r.Resolvers
+func (r *MultiClientResolver) Resolve(request ResolveRequest) (conn ClientConn, err error) {
+	for _, resolver := range r.Resolvers {
+		conn, err = resolver.Resolve(request)
+		if err == nil {
+			break
+		}
+	}
+
+	return conn, err
+}

@@ -2,15 +2,14 @@ package agent
 
 import (
 	"errors"
-	"flag"
 	"net"
 	"os"
 	"os/signal"
 	"strconv"
 	"syscall"
+	"time"
 
 	"github.com/doubledutch/quantum"
-	"github.com/doubledutch/quantum/consul"
 	"github.com/doubledutch/quantum/inmemory"
 
 	"github.com/doubledutch/lager"
@@ -24,42 +23,17 @@ var (
 
 // Config encapsulates configuration for an agent
 type Config struct {
-	*quantum.Config
-	Port   string
-	Server string
+	*quantum.ConnConfig
 
-	Levels string
+	Port string
 
 	Registry    quantum.Registry
 	Registrator quantum.Registrator
 }
 
-// RegisterFlags takes defaultFlags and registers quantum agent flags
-func RegisterFlags(defaultFlags *Config) *Config {
-	config := new(Config)
-	config.Config = quantum.DefaultConfig()
-	if defaultFlags == nil {
-		defaultFlags = new(Config)
-	}
-	if defaultFlags.Config == nil {
-		defaultFlags.Config = quantum.DefaultConfig()
-	}
-
-	if defaultFlags.Levels == "" {
-		defaultFlags.Levels = "IE"
-	}
-
-	flag.StringVar(&config.Port, "p", defaultFlags.Port, "port to run on")
-	// This is required to create the Registrator
-	flag.StringVar(&config.Server, "s", defaultFlags.Server, "quantum service server to register with")
-	flag.StringVar(&config.Levels, "log", defaultFlags.Levels, "log levels")
-
-	return config
-}
-
 // Agent routes job requests to jobs, and runs the jobs with the request
 type Agent struct {
-	config *quantum.Config
+	*quantum.ConnConfig
 
 	port  string
 	done  chan struct{}
@@ -67,43 +41,42 @@ type Agent struct {
 
 	quantum.Registry
 	registrator quantum.Registrator
-
-	lgr lager.Lager
 }
 
 // New creates a new Agent with the specified port
 func New(config *Config) quantum.Agent {
-	lager := lager.NewLogLager(&lager.LogConfig{
-		Levels: lager.LevelsFromString(config.Levels),
-		Output: os.Stdout,
-	})
+	if config.Pool == nil {
+		config.Pool = new(gob.Pool)
+	}
 
-	if config.Config == nil {
-		config.Config = &quantum.Config{
-			Pool:  new(gob.Pool),
-			Lager: lager,
-		}
+	if config.Lager == nil {
+		config.Lager = lager.NewLogLager(&lager.LogConfig{
+			Levels: lager.LevelsFromString("IE"),
+			Output: os.Stdout,
+		})
 	}
 
 	if config.Registry == nil {
-		config.Registry = inmemory.NewRegistry()
+		config.Registry = inmemory.NewRegistry(config.Lager)
 	}
 
 	if config.Registrator == nil {
-		config.Registrator = consul.NewRegistrator(config.Server, lager)
+		config.Registrator = inmemory.NewRegistrator()
+	}
+
+	if config.Timeout == 0 {
+		config.Timeout = 100 * time.Millisecond
 	}
 
 	return &Agent{
-		config: config.Config,
-		port:   config.Port,
-		done:   make(chan struct{}),
-		sigCh:  make(chan os.Signal, 1),
+		ConnConfig: config.ConnConfig,
 
-		// These should be injected as defaults
 		Registry:    config.Registry,
 		registrator: config.Registrator,
 
-		lgr: lager,
+		port:  config.Port,
+		done:  make(chan struct{}),
+		sigCh: make(chan os.Signal, 1),
 	}
 }
 
@@ -114,8 +87,9 @@ func (a *Agent) Accept(ln net.Listener) error {
 		return err
 	}
 
-	conn, err := NewConn(netConn, a.config)
+	conn, err := NewConn(netConn, a.ConnConfig)
 	if err != nil {
+		a.Lager.Errorf("Error creating agent conn: %s", err)
 		return err
 	}
 
@@ -155,12 +129,15 @@ func (a *Agent) Start() error {
 		}
 	}()
 
+	a.Lager.Debugf("Registering")
 	if err := a.registrator.Register(NewPort(a.port).Int(), a); err != nil {
-		a.lgr.Warnf("Failed to announce services: %s\n", err)
+		a.Lager.Errorf("Failed to announce services: %s\n", err)
+		return err
 	}
 
 	// Blocks
-	return quantum.ListenAndServe(a, a.port, a.lgr)
+	a.Lager.Debugf("ListenAndServe block")
+	return quantum.ListenAndServe(a, a.port, a.Lager)
 }
 
 // Port holds a port in the form :XXXX

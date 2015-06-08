@@ -2,7 +2,6 @@ package agent
 
 import (
 	"errors"
-	"log"
 	"net"
 	"os"
 	"runtime/debug"
@@ -27,14 +26,12 @@ type Conn struct {
 }
 
 // NewConn returns a new Connection connected to the specified io.ReadWriter
-func NewConn(conn net.Conn, config *quantum.Config) (*Conn, error) {
-	muxConfig := mux.DefaultConfig()
+func NewConn(conn net.Conn, config *quantum.ConnConfig) (*Conn, error) {
 	if config == nil {
-		config = quantum.DefaultConfig()
+		config = quantum.DefaultConnConfig()
 	}
 
-	muxConfig.Lager = config.Lager
-	srv, err := config.Pool.NewServer(conn, muxConfig)
+	srv, err := config.Pool.NewServer(conn, config.ToMux())
 	if err != nil {
 		return nil, err
 	}
@@ -49,7 +46,7 @@ func NewConn(conn net.Conn, config *quantum.Config) (*Conn, error) {
 	}
 
 	// Send up receiver for signals
-	sigR := ac.Pool().NewReceiver(ac.SigCh)
+	sigR := mux.NewSignalReceiver(ac.SigCh, config.Pool)
 	srv.Receive(mux.SignalType, sigR)
 
 	requestR := quantum.NewRequestReceiver(ac.RequestCh)
@@ -70,6 +67,12 @@ func (conn *Conn) Logs() chan string {
 	return conn.OutCh
 }
 
+// Lager returns the Lager of the connection, allowing jobs
+// to log to the agent
+func (conn *Conn) Lager() lager.Lager {
+	return conn.lgr
+}
+
 // Serve processes a connection and serves the response
 func (conn *Conn) Serve(reg quantum.Registry) {
 	conn.Done(conn.serve(reg))
@@ -85,7 +88,7 @@ func (conn *Conn) serve(reg quantum.Registry) (err error) {
 
 	defer func() {
 		if r := recover(); r != nil {
-			log.Printf("job err: %s\n%s", r, debug.Stack())
+			conn.lgr.Errorf("job err: %s\n%s", r, debug.Stack())
 			err = ErrUnexpectedError
 		}
 	}()
@@ -94,10 +97,12 @@ func (conn *Conn) serve(reg quantum.Registry) (err error) {
 
 	job, err := reg.Get(request)
 	if err != nil {
+		conn.lgr.Errorf("Error getting job: %s\n", err)
 		return
 	}
 
+	conn.lgr.Debugf("running job: %s", err)
 	err = job.Run(conn)
-	conn.lgr.Infof("job completed: %s\n", err)
+	conn.lgr.Infof("job completed: %s", err)
 	return
 }

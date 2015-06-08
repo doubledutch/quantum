@@ -1,13 +1,16 @@
 package integration
 
 import (
-	"errors"
 	"log"
 	"net"
+	"os"
 	"strconv"
 	"sync"
 	"testing"
+	"time"
 
+	"github.com/doubledutch/lager"
+	"github.com/doubledutch/mux/gob"
 	"github.com/doubledutch/quantum"
 	"github.com/doubledutch/quantum/agent"
 	"github.com/doubledutch/quantum/client"
@@ -57,12 +60,6 @@ func (s AddStep) Run(state quantum.StateBag) error {
 
 func (s AddStep) Cleanup(state quantum.StateBag) {}
 
-type ErrorStep struct{}
-
-func (s ErrorStep) Run(state quantum.StateBag) error {
-	return errors.New("error")
-}
-
 func (j *testAgentJob) Steps() []quantum.Step {
 	return []quantum.Step{
 		&AddStep{},
@@ -81,20 +78,36 @@ func listenTCP() (net.Listener, string) {
 
 func TestClientAgent(t *testing.T) {
 	port := ":0"
+
+	qc := &quantum.Config{
+		Pool: new(gob.Pool),
+		Lager: lager.NewLogLager(&lager.LogConfig{
+			Levels: lager.LevelsFromString("DIE"),
+			Output: os.Stdout,
+		}),
+	}
+
+	cc := &quantum.ConnConfig{
+		Timeout: 100 * time.Millisecond,
+		Config:  qc,
+	}
+
 	agent := agent.New(&agent.Config{
-		Port: port,
+		Port:       port,
+		ConnConfig: cc,
 	})
-	agent.Add(&testAgentJob{})
+	agent.Add(new(testAgentJob))
 
 	l, agentAddr := listenTCP()
 	go func() {
 		if err := agent.Accept(l); err != nil {
 			t.Fatal(err)
+			t.FailNow()
 		}
 	}()
 
 	request := quantum.NewRequest(serverJob, "{}")
-	client := client.New(nil)
+	client := client.New(cc)
 
 	conn, err := client.Dial(agentAddr)
 	if err != nil {
@@ -115,63 +128,3 @@ func TestClientAgent(t *testing.T) {
 	}
 	wg.Wait()
 }
-
-/*
-func TestClientAgentServer(t *testing.T) {
-	server := NewServer()
-	ls, serverAddr := listenTCP()
-	go func() {
-		// Register agent record
-		if err := server.Accept(ls); err != nil {
-			t.Fatal(err)
-			t.FailNow()
-		}
-		// ClientResolve
-		if err := server.Accept(ls); err != nil {
-			t.Fatal(err)
-			t.FailNow()
-		}
-	}()
-
-	la, agentAddr := listenTCP()
-	parts := strings.Split(agentAddr, ":")
-	agent := NewAgent(":" + parts[1])
-	agent.Register(&testAgentJob{})
-	go func() {
-		if err := agent.Accept(la); err != nil {
-			t.Fatal(err)
-		}
-	}()
-
-	if err := agent.Announce(serverAddr); err != nil {
-		t.Fatal(err)
-		t.FailNow()
-	}
-
-	cr := NewClientResolver()
-	configs, err := cr.Resolve(serverAddr, "test", serverJob, "{}")
-	if err != nil {
-		t.Fatal(err)
-		t.FailNow()
-	}
-
-	outCh := make(chan string)
-	sigCh := make(chan os.Signal)
-	defer close(sigCh)
-
-	var wg sync.WaitGroup
-	wg.Add(1)
-	go func() {
-		for _ = range outCh {
-			// Consume the channel
-		}
-		wg.Done()
-	}()
-
-	if err := cr.RunWith(configs, outCh, sigCh); err != nil {
-		t.Fatal(err)
-		t.FailNow()
-	}
-	close(outCh)
-	wg.Wait()
-}*/
