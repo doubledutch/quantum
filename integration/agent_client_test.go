@@ -3,14 +3,10 @@ package integration
 import (
 	"log"
 	"net"
-	"os"
 	"strconv"
 	"sync"
 	"testing"
-	"time"
 
-	"github.com/doubledutch/lager"
-	"github.com/doubledutch/mux/gob"
 	"github.com/doubledutch/quantum"
 	"github.com/doubledutch/quantum/agent"
 	"github.com/doubledutch/quantum/client"
@@ -79,22 +75,8 @@ func listenTCP() (net.Listener, string) {
 func TestClientAgent(t *testing.T) {
 	port := ":0"
 
-	qc := &quantum.Config{
-		Pool: new(gob.Pool),
-		Lager: lager.NewLogLager(&lager.LogConfig{
-			Levels: lager.LevelsFromString("DIE"),
-			Output: os.Stdout,
-		}),
-	}
-
-	cc := &quantum.ConnConfig{
-		Timeout: 100 * time.Millisecond,
-		Config:  qc,
-	}
-
 	agent := agent.New(&agent.Config{
-		Port:       port,
-		ConnConfig: cc,
+		Port: port,
 	})
 	agent.Add(new(testAgentJob))
 
@@ -107,7 +89,7 @@ func TestClientAgent(t *testing.T) {
 	}()
 
 	request := quantum.NewRequest(serverJob, "{}")
-	client := client.New(cc)
+	client := client.New(nil)
 
 	conn, err := client.Dial(agentAddr)
 	if err != nil {

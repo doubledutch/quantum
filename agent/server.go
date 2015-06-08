@@ -11,9 +11,6 @@ import (
 
 	"github.com/doubledutch/quantum"
 	"github.com/doubledutch/quantum/inmemory"
-
-	"github.com/doubledutch/lager"
-	"github.com/doubledutch/mux/gob"
 )
 
 var (
@@ -45,15 +42,12 @@ type Agent struct {
 
 // New creates a new Agent with the specified port
 func New(config *Config) quantum.Agent {
-	if config.Pool == nil {
-		config.Pool = new(gob.Pool)
+	if config == nil {
+		config = new(Config)
 	}
 
-	if config.Lager == nil {
-		config.Lager = lager.NewLogLager(&lager.LogConfig{
-			Levels: lager.LevelsFromString("IE"),
-			Output: os.Stdout,
-		})
+	if config.ConnConfig == nil {
+		config.ConnConfig = quantum.DefaultConnConfig()
 	}
 
 	if config.Registry == nil {
