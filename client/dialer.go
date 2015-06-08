@@ -14,6 +14,10 @@ type Client struct {
 
 // New returns a new Client with the specified host and port
 func New(config *quantum.ConnConfig) quantum.Client {
+	if config == nil {
+		config = quantum.DefaultConnConfig()
+	}
+
 	return &Client{
 		ConnConfig: config,
 	}
