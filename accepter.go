@@ -3,7 +3,6 @@ package quantum
 import (
 	"errors"
 	"io"
-	"log"
 	"net"
 	"time"
 
@@ -36,7 +35,7 @@ func ListenAndServe(a Acceptor, port string, lgr lager.Lager) error {
 		a.Close()
 		return ErrListen
 	}
-	lgr.Infof("Listening on " + port)
+	lgr.Infof("Listening on %s", port)
 RECV_LOOP:
 	for {
 		// Set a deadline so we can check for shutdown
@@ -53,7 +52,7 @@ RECV_LOOP:
 				continue
 			}
 
-			log.Println(err)
+			lgr.Errorf("Accepter accept err: %s", err)
 		}
 	}
 
