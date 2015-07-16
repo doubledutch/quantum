@@ -16,15 +16,6 @@ type Runner interface {
 	Run(string, chan<- string, <-chan os.Signal) error
 }
 
-/*
-// BasicRun is a basic way to run jobs. It takes care of creating the necessary
-// dependencies and making them available to the statebag. It also checks for the
-// statebags error.
-func BasicRun(job BasicJob, conn AgentConn) error {
-
-}
-*/
-
 // NewBasicRunner returns a basic runner
 func NewBasicRunner() (r Runner) {
 	return &BasicRunner{}
@@ -43,7 +34,12 @@ func (r *BasicRunner) Run(cmd string,
 		shell = "cmd"
 		flag = "/C"
 	} else {
-		shell = "/bin/bash"
+		envShell := os.Getenv("SHELL")
+		if envShell != "" {
+			shell = envShell
+		} else {
+			shell = "/bin/bash"
+		}
 		flag = "-c"
 	}
 	// Tell the client what we're running.
