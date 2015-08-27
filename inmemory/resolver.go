@@ -38,7 +38,7 @@ func (r *ClientResolver) Resolve(request quantum.ResolveRequest) (quantum.Client
 	var addr string
 	var ok bool
 	if addr, ok = r.registrator.Jobs[request.Type]; !ok {
-		return nil, quantum.ErrNoAgents
+		return nil, quantum.NoAgentsFromRequest(request)
 	}
 
 	return r.client.Dial(addr)

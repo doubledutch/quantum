@@ -1,15 +1,43 @@
 package quantum
 
-import "errors"
+import (
+	"errors"
+	"fmt"
+	"strings"
+)
 
 // TODO: Resolve with Consul or DNS
 
 var (
 	// ErrNoConfigs occurs when there are no configs to work with
 	ErrNoConfigs = errors.New("no configs provided")
-	// ErrNoAgents occurs when no agents responded to pings
-	ErrNoAgents = errors.New("no agents responded")
 )
+
+// IsNoAgentsErr returns whether this error is a no agents responded error
+func IsNoAgentsErr(err error) bool {
+	return strings.Contains(err.Error(), "no agents responded")
+}
+
+// NoAgentsErr creates an error for no agents that responded with type
+func NoAgentsErr(t string) error {
+	return fmt.Errorf("no agents responded with type %s", t)
+}
+
+// NoAgentsWithNameErr creates an error for no agents that responded with type and name
+func NoAgentsWithNameErr(t string, name string) error {
+	return fmt.Errorf("no agents responded with type %s and name %s", t, name)
+}
+
+// NoAgentsFromRequest creates an error for no agents that responded from a request
+func NoAgentsFromRequest(request ResolveRequest) (err error) {
+	if request.Agent == "" {
+		err = NoAgentsErr(request.Type)
+	} else {
+		err = NoAgentsWithNameErr(request.Type, request.Agent)
+	}
+
+	return
+}
 
 // ClientResolver defines the interface for a resolver client.
 type ClientResolver interface {

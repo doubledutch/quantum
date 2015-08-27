@@ -40,6 +40,10 @@ func (cr *ClientResolver) Resolve(request quantum.ResolveRequest) (quantum.Clien
 		return nil, err
 	}
 
+	if len(results) == 0 {
+		return nil, quantum.NoAgentsFromRequest(request)
+	}
+
 	// Ping each one, return the first one to respond
 	return cr.resolveClient(results)
 }
@@ -87,12 +91,11 @@ func newResolveResults(in *dns.Msg, rr quantum.ResolveRequest) (results []resolv
 }
 
 func (cr *ClientResolver) resolveClient(results []resolveResult) (conn quantum.ClientConn, err error) {
-	err = quantum.ErrNoAgents
-	// TODO: Do this concurrently
+	// TODO: Do this concurrently, first one to respond wins
 	for _, result := range results {
 		client := client.New(cr.config)
 		conn, err = client.Dial(result.address)
-		if err != nil {
+		if err == nil {
 			break
 		}
 	}
