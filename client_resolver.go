@@ -20,12 +20,12 @@ func IsNoAgentsErr(err error) bool {
 
 // NoAgentsErr creates an error for no agents that responded with type
 func NoAgentsErr(t string) error {
-	return fmt.Errorf("no agents with responded with type %s", t)
+	return fmt.Errorf("no agents responded with type %s", t)
 }
 
 // NoAgentsWithNameErr creates an error for no agents that responded with type and name
 func NoAgentsWithNameErr(t string, name string) error {
-	return fmt.Errorf("no agents with responded with type %s and name %s", t, name)
+	return fmt.Errorf("no agents responded with type %s and name %s", t, name)
 }
 
 // NoAgentsFromRequest creates an error for no agents that responded from a request
