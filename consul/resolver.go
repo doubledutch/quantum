@@ -1,12 +1,14 @@
 package consul
 
 import (
+	"fmt"
 	"strconv"
 	"strings"
 
 	"github.com/doubledutch/lager"
 	"github.com/doubledutch/quantum"
 	"github.com/doubledutch/quantum/client"
+	"github.com/hashicorp/consul/api"
 	"github.com/miekg/dns"
 )
 
@@ -50,6 +52,14 @@ func (cr *ClientResolver) Resolve(request quantum.ResolveRequest) (quantum.Clien
 
 // ResolveConfigs resolves client configs given the specified arguments
 func (cr *ClientResolver) resolveResults(rr quantum.ResolveRequest) (results []resolveResult, err error) {
+	if rr.Agent == "" {
+		return cr.resolveWithDNS(rr)
+	}
+
+	return cr.resolveWithAPI(rr)
+}
+
+func (cr *ClientResolver) resolveWithDNS(rr quantum.ResolveRequest) (results []resolveResult, err error) {
 	m := new(dns.Msg)
 	srv := rr.Type + ".service.consul."
 	m.SetQuestion(srv, dns.TypeSRV)
@@ -88,6 +98,31 @@ func newResolveResults(in *dns.Msg, rr quantum.ResolveRequest) (results []resolv
 		})
 	}
 	return
+}
+
+func (cr *ClientResolver) resolveWithAPI(rr quantum.ResolveRequest) (results []resolveResult, err error) {
+	client, err := api.NewClient(&api.Config{
+		Address: cr.server,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	catalog := client.Catalog()
+	node, _, err := catalog.Node(rr.Agent, nil)
+	if err != nil {
+		return nil, quantum.NoAgentsFromRequest(rr)
+	}
+	service, ok := node.Services[rr.Type]
+	if !ok {
+		return nil, quantum.NoAgentsFromRequest(rr)
+	}
+
+	return []resolveResult{
+		{
+			address: fmt.Sprintf("%s:%d", service.Address, service.Port),
+		},
+	}, nil
 }
 
 func (cr *ClientResolver) resolveClient(results []resolveResult) (conn quantum.ClientConn, err error) {
