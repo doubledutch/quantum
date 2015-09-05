@@ -32,6 +32,9 @@ type ClientResolver struct {
 	config *quantum.ConnConfig
 	lgr    lager.Lager
 	server string
+
+	dnsc  *dns.Client
+	httpc *api.Client
 }
 
 // Resolve resolves a ClientConn using a ResolveRequest
@@ -61,11 +64,15 @@ func (cr *ClientResolver) resolveResults(rr quantum.ResolveRequest) (results []r
 
 func (cr *ClientResolver) resolveWithDNS(rr quantum.ResolveRequest) (results []resolveResult, err error) {
 	m := new(dns.Msg)
+	// For now, assume .service.consul. for domain
 	srv := rr.Type + ".service.consul."
 	m.SetQuestion(srv, dns.TypeSRV)
 
-	c := &dns.Client{Net: "tcp"}
-	in, _, err := c.Exchange(m, cr.server)
+	if cr.dnsc == nil {
+		cr.dnsc = &dns.Client{Net: "tcp"}
+	}
+	// For now, assume :8600 for Consul DNS
+	in, _, err := cr.dnsc.Exchange(m, cr.server+":8600")
 	if err != nil {
 		cr.lgr.Errorf("DNS Exchange failed: %s\n", err)
 		return nil, err
@@ -101,28 +108,38 @@ func newResolveResults(in *dns.Msg, rr quantum.ResolveRequest) (results []resolv
 }
 
 func (cr *ClientResolver) resolveWithAPI(rr quantum.ResolveRequest) (results []resolveResult, err error) {
-	client, err := api.NewClient(&api.Config{
-		Address: cr.server,
-	})
-	if err != nil {
-		return nil, err
+	if cr.httpc == nil {
+		// For now, assume port :8500 for HTTP API
+		cr.httpc, err = api.NewClient(&api.Config{
+			Address: cr.server + ":8500",
+		})
+		if err != nil {
+			return nil, err
+		}
 	}
 
-	catalog := client.Catalog()
+	catalog := cr.httpc.Catalog()
 	node, _, err := catalog.Node(rr.Agent, nil)
 	if err != nil {
 		return nil, quantum.NoAgentsFromRequest(rr)
 	}
-	service, ok := node.Services[rr.Type]
-	if !ok {
+
+	// Quantum services are registered with an UUID for an ID for uniqueness.
+	// The agent consul dictionary maps services by the ID. Since we don't know
+	// UUID we're looking for, loop over all services to search by service name.
+	var service *api.AgentService
+	for _, srv := range node.Services {
+		if srv.Service == rr.Type {
+			service = srv
+			break
+		}
+	}
+
+	if service == nil {
 		return nil, quantum.NoAgentsFromRequest(rr)
 	}
 
-	return []resolveResult{
-		{
-			address: fmt.Sprintf("%s:%d", service.Address, service.Port),
-		},
-	}, nil
+	return []resolveResult{{address: fmt.Sprintf("%s:%d", service.Address, service.Port)}}, nil
 }
 
 func (cr *ClientResolver) resolveClient(results []resolveResult) (conn quantum.ClientConn, err error) {
