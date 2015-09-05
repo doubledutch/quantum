@@ -139,6 +139,10 @@ func (cr *ClientResolver) resolveWithAPI(rr quantum.ResolveRequest) (results []r
 		return nil, quantum.NoAgentsFromRequest(rr)
 	}
 
+	if service.Address == "" {
+		service.Address = node.Node.Address
+	}
+
 	return []resolveResult{{address: fmt.Sprintf("%s:%d", service.Address, service.Port)}}, nil
 }
 
