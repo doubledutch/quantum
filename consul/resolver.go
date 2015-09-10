@@ -17,13 +17,17 @@ type resolveResult struct {
 }
 
 // NewClientResolver creates a consul client resolver
-func NewClientResolver(config quantum.ClientResolverConfig) quantum.ClientResolver {
+func NewClientResolver(httpAddr, dnsAddr string, config *quantum.ConnConfig) quantum.ClientResolver {
+	if config == nil {
+		config = quantum.DefaultConnConfig()
+	}
 	if config.Config == nil {
 		config.Config = quantum.DefaultConfig()
 	}
 	return &ClientResolver{
-		lgr:    config.Config.Lager,
-		server: config.Server,
+		config:   config,
+		httpAddr: httpAddr,
+		dnsAddr:  dnsAddr,
 	}
 }
 
@@ -31,7 +35,9 @@ func NewClientResolver(config quantum.ClientResolverConfig) quantum.ClientResolv
 type ClientResolver struct {
 	config *quantum.ConnConfig
 	lgr    lager.Lager
-	server string
+
+	httpAddr string
+	dnsAddr  string
 
 	dnsc  *dns.Client
 	httpc *api.Client
@@ -71,8 +77,7 @@ func (cr *ClientResolver) resolveWithDNS(rr quantum.ResolveRequest) (results []r
 	if cr.dnsc == nil {
 		cr.dnsc = &dns.Client{Net: "tcp"}
 	}
-	// For now, assume :8600 for Consul DNS
-	in, _, err := cr.dnsc.Exchange(m, cr.server+":8600")
+	in, _, err := cr.dnsc.Exchange(m, cr.dnsAddr)
 	if err != nil {
 		cr.lgr.Errorf("DNS Exchange failed: %s\n", err)
 		return nil, err
@@ -109,9 +114,8 @@ func newResolveResults(in *dns.Msg, rr quantum.ResolveRequest) (results []resolv
 
 func (cr *ClientResolver) resolveWithAPI(rr quantum.ResolveRequest) (results []resolveResult, err error) {
 	if cr.httpc == nil {
-		// For now, assume port :8500 for HTTP API
 		cr.httpc, err = api.NewClient(&api.Config{
-			Address: cr.server + ":8500",
+			Address: cr.httpAddr,
 		})
 		if err != nil {
 			return nil, err
