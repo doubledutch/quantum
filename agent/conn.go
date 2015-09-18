@@ -11,6 +11,11 @@ import (
 	"github.com/doubledutch/quantum"
 )
 
+var (
+	// ErrUnexpectedError describes the error when a job panics
+	ErrUnexpectedError = errors.New("Job exited with unexpected error")
+)
+
 // Conn wraps a Connection
 type Conn struct {
 	mux.Server
@@ -45,10 +50,11 @@ func NewConn(conn net.Conn, config *quantum.ConnConfig) (*Conn, error) {
 		lgr: config.Lager,
 	}
 
-	// Send up receiver for signals
+	// Set up receiver for signals
 	sigR := mux.NewSignalReceiver(ac.SigCh, config.Pool)
 	srv.Receive(mux.SignalType, sigR)
 
+	// Set up receiver for requests
 	requestR := quantum.NewRequestReceiver(ac.RequestCh)
 	srv.Receive(quantum.RequestType, requestR)
 
