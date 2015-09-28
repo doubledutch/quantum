@@ -5,7 +5,6 @@ import (
 	"net"
 	"os"
 	"os/signal"
-	"strconv"
 	"syscall"
 	"time"
 
@@ -22,7 +21,7 @@ var (
 type Config struct {
 	*quantum.ConnConfig
 
-	Port string
+	Addr string
 
 	Registry    quantum.Registry
 	Registrator quantum.Registrator
@@ -32,7 +31,7 @@ type Config struct {
 type Agent struct {
 	*quantum.ConnConfig
 
-	port  string
+	addr  string
 	done  chan struct{}
 	sigCh chan os.Signal
 
@@ -68,7 +67,7 @@ func New(config *Config) quantum.Agent {
 		Registry:    config.Registry,
 		registrator: config.Registrator,
 
-		port:  config.Port,
+		addr:  config.Addr,
 		done:  make(chan struct{}),
 		sigCh: make(chan os.Signal, 1),
 	}
@@ -118,7 +117,7 @@ func (a *Agent) Start() error {
 	}()
 
 	a.Lager.Debugf("Registering")
-	if err := a.registrator.Register(NewPort(a.port).Int(), a); err != nil {
+	if err := a.registrator.Register(NewPort(a.addr).Port(), a); err != nil {
 		a.Lager.Errorf("Failed to announce services: %s\n", err)
 		return err
 	}
@@ -126,13 +125,13 @@ func (a *Agent) Start() error {
 	// Blocks
 	if a.ConnConfig.TLSConfig != nil {
 		a.Lager.Debugf("ListenAndServeTLS blocking")
-		return quantum.ListenAndServeTLS(a, a.port, a.ConnConfig.TLSConfig, a.Lager)
+		return quantum.ListenAndServeTLS(a, a.addr, a.ConnConfig.TLSConfig, a.Lager)
 	}
 	a.Lager.Debugf("ListenAndServe blocking")
-	return quantum.ListenAndServe(a, a.port, a.Lager)
+	return quantum.ListenAndServe(a, a.addr, a.Lager)
 }
 
-// Port holds a port in the form :XXXX
+// Port holds a network address
 type Port struct {
 	Value string
 }
@@ -142,13 +141,11 @@ func NewPort(s string) Port {
 	return Port{Value: s}
 }
 
-// Int returns a int representation of Port
-func (p Port) Int() int {
-	number := p.Value[1:] // ignore : at [0]
-
-	i, err := strconv.Atoi(number)
+// Port returns a int representation of Port
+func (p Port) Port() int {
+	netAddr, err := net.ResolveTCPAddr("tcp", p.Value)
 	if err != nil {
 		return -1
 	}
-	return i
+	return netAddr.Port
 }

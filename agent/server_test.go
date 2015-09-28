@@ -75,7 +75,14 @@ func TestPort(t *testing.T) {
 		t.Fatal("wrong port value")
 	}
 
-	if p.Int() != 8500 {
+	if p.Port() != 8500 {
 		t.Fatal("wrong port int")
+	}
+}
+func TestInvalidPort(t *testing.T) {
+	p := NewPort("asdf")
+
+	if p.Port() != -1 {
+		t.Fatal("Expected port failure")
 	}
 }
