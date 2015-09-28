@@ -2,6 +2,7 @@ package consul
 
 import (
 	"fmt"
+	"os"
 	"strconv"
 	"strings"
 
@@ -14,6 +15,11 @@ import (
 
 type resolveResult struct {
 	address string
+}
+
+// NewClientResolverFromEnv creates a Consul Client Resolver from the environment
+func NewClientResolverFromEnv(config *quantum.ConnConfig) quantum.ClientResolver {
+	return NewClientResolver(os.Getenv("CONSUL_HTTP"), os.Getenv("CONSUL_DNS"), config)
 }
 
 // NewClientResolver creates a consul client resolver

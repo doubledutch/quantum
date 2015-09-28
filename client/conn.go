@@ -59,10 +59,12 @@ func (c *Conn) Signals() chan<- os.Signal {
 // Run sends the Request to the server on the other send
 // and waits for the response.
 func (c *Conn) Run(request quantum.Request) error {
-	// Use type of request data to create a requester
+	// Connections are single use
+	defer c.Close()
+
 	c.lgr.Debugf("Sending request: %s", request)
 	if err := c.Send(quantum.RequestType, request); err != nil {
-		c.lgr.Errorf("Error sending request: %s", request)
+		c.lgr.Errorf("Error sending request: %s", err)
 		return err
 	}
 
@@ -80,13 +82,13 @@ func (c *Conn) Run(request quantum.Request) error {
 
 	c.lgr.Debugf("Waiting")
 	err := c.Wait()
-	c.Close()
 	return err
 }
 
 // Close closes ClientConn
 func (c *Conn) Close() error {
 	// We need to close senders, receivers are closed by mux.Client
+	c.Client.Shutdown()
 	close(c.sigCh)
 	return nil
 }

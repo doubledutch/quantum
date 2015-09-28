@@ -1,6 +1,7 @@
 package client
 
 import (
+	"crypto/tls"
 	"net"
 	"time"
 
@@ -25,18 +26,25 @@ func New(config *quantum.ConnConfig) quantum.Client {
 
 // Dial connects to the address and returns quantum.ClientConn
 func (c *Client) Dial(address string) (quantum.ClientConn, error) {
-	netConn, err := net.Dial("tcp", address)
-	if err != nil {
-		return nil, err
-	}
-
-	return NewConn(netConn, c.ConnConfig)
+	return c.dialWithDialer(new(net.Dialer), address)
 }
 
 // DialTimeout connects to the address and returns quantum.ClientConn, timing out
 // after time
 func (c *Client) DialTimeout(address string, time time.Duration) (quantum.ClientConn, error) {
-	netConn, err := net.DialTimeout("tcp", address, time)
+	return c.dialWithDialer(&net.Dialer{Timeout: time}, address)
+}
+
+func (c *Client) dialWithDialer(d *net.Dialer, address string) (quantum.ClientConn, error) {
+	var netConn net.Conn
+	var err error
+
+	if c.ConnConfig.TLSConfig != nil {
+		netConn, err = tls.DialWithDialer(d, "tcp", address, c.ConnConfig.TLSConfig)
+	} else {
+		netConn, err = d.Dial("tcp", address)
+	}
+
 	if err != nil {
 		return nil, err
 	}

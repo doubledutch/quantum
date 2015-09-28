@@ -74,13 +74,8 @@ func New(config *Config) quantum.Agent {
 	}
 }
 
-// Accept accepts on a specified net.Listener
-func (a *Agent) Accept(ln net.Listener) error {
-	netConn, err := ln.Accept()
-	if err != nil {
-		return err
-	}
-
+// Serve serves a connection
+func (a *Agent) Serve(netConn net.Conn) error {
 	conn, err := NewConn(netConn, a.ConnConfig)
 	if err != nil {
 		a.Lager.Errorf("Error creating agent conn: %s", err)
@@ -91,8 +86,8 @@ func (a *Agent) Accept(ln net.Listener) error {
 	return nil
 }
 
-// IsShutdown returns a chan that determines whether we're shutdown
-func (a *Agent) IsShutdown() chan struct{} {
+// IsClosed return a chan determining if agent is closed or not
+func (a *Agent) IsClosed() chan struct{} {
 	return a.done
 }
 
@@ -111,7 +106,6 @@ func (a *Agent) Start() error {
 		syscall.SIGTERM,
 		syscall.SIGQUIT,
 		syscall.SIGKILL)
-	defer close(a.sigCh)
 
 	// TODO: We should also notify any running jobs
 	// Or, we can start a goroutine to update each connection when this happens?
@@ -130,7 +124,11 @@ func (a *Agent) Start() error {
 	}
 
 	// Blocks
-	a.Lager.Debugf("ListenAndServe block")
+	if a.ConnConfig.TLSConfig != nil {
+		a.Lager.Debugf("ListenAndServeTLS blocking")
+		return quantum.ListenAndServeTLS(a, a.port, a.ConnConfig.TLSConfig, a.Lager)
+	}
+	a.Lager.Debugf("ListenAndServe blocking")
 	return quantum.ListenAndServe(a, a.port, a.Lager)
 }
 
