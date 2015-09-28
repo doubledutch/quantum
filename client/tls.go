@@ -32,6 +32,6 @@ func NewTLSConfig(certFile, keyFile, caFile string) (*tls.Config, error) {
 		Certificates: []tls.Certificate{cert},
 		MinVersion:   tls.VersionTLS10,
 		CipherSuites: clientCipherSuites,
-		ClientCAs:    certPool,
+		RootCAs:      certPool,
 	}, nil
 }
