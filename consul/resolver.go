@@ -124,7 +124,7 @@ func (cr *ClientResolver) resolveWithAPI(rr quantum.ResolveRequest) (results []r
 
 	catalog := cr.httpc.Catalog()
 	node, _, err := catalog.Node(rr.Agent, nil)
-	if err != nil {
+	if err != nil || node == nil {
 		return nil, quantum.NoAgentsFromRequest(rr)
 	}
 
