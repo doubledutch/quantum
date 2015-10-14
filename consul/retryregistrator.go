@@ -29,24 +29,17 @@ type RetryRegistrator struct {
 
 // Register will register types with Consul
 func (r *RetryRegistrator) Register(port int, reg quantum.Registry) error {
-	var operation = func() (err error) {
-		if r.client == nil {
-			r.client, err = api.NewClient(&api.Config{
-				Address: r.httpAddr,
-			})
-			if err != nil {
-				return err
-			}
-		}
-		return nil
+	var err error
+	if r.client == nil {
+		r.client, err = api.NewClient(&api.Config{
+			Address: r.httpAddr,
+		})
 	}
-	err := backoff.Retry(operation, backoff.NewExponentialBackOff())
 	if err != nil {
 		r.lgr.Errorf("Unable to connect to Consul: %s\n", err)
 		return err
 	}
 	merr := &multierror.Error{}
-
 	// Relies on local consul agent
 	agent := r.client.Agent()
 	for _, jobType := range reg.Types() {
@@ -58,7 +51,14 @@ func (r *RetryRegistrator) Register(port int, reg quantum.Registry) error {
 			Port: port,
 			Tags: []string{"quantum"},
 		}
-		if err := agent.ServiceRegister(service); err != nil {
+		err = backoff.Retry(func() error {
+			err = agent.ServiceRegister(service)
+			if err != nil {
+				return err
+			}
+			return nil
+		}, backoff.NewExponentialBackOff())
+		if err != nil {
 			multierror.Append(merr, err)
 		} else {
 			r.serviceIDs = append(r.serviceIDs, ID)
