@@ -123,8 +123,22 @@ func (cr *ClientResolver) resolveWithAPI(rr quantum.ResolveRequest) (results []r
 	}
 
 	catalog := cr.httpc.Catalog()
-	node, _, err := catalog.Node(rr.Agent, nil)
-	if err != nil || node == nil {
+	var nodeName string
+	nodes, _, err := catalog.Nodes(nil)
+	if err != nil {
+		return nil, err
+	}
+	for _, node := range nodes {
+		if strings.ToLower(node.Node) == strings.ToLower(rr.Agent) {
+			nodeName = node.Node
+			break
+		}
+	}
+	if nodeName == "" {
+		return nil, quantum.NoAgentsFromRequest(rr)
+	}
+	node, _, err := catalog.Node(nodeName, nil)
+	if node == nil || err != nil {
 		return nil, quantum.NoAgentsFromRequest(rr)
 	}
 
