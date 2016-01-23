@@ -5,7 +5,6 @@ import (
 	"net"
 	"os"
 	"os/signal"
-	"strconv"
 	"syscall"
 	"time"
 
@@ -22,7 +21,7 @@ var (
 type Config struct {
 	*quantum.ConnConfig
 
-	Port string
+	Addr string
 
 	Registry    quantum.Registry
 	Registrator quantum.Registrator
@@ -32,7 +31,7 @@ type Config struct {
 type Agent struct {
 	*quantum.ConnConfig
 
-	port  string
+	addr  string
 	done  chan struct{}
 	sigCh chan os.Signal
 
@@ -68,19 +67,14 @@ func New(config *Config) quantum.Agent {
 		Registry:    config.Registry,
 		registrator: config.Registrator,
 
-		port:  config.Port,
+		addr:  config.Addr,
 		done:  make(chan struct{}),
 		sigCh: make(chan os.Signal, 1),
 	}
 }
 
-// Accept accepts on a specified net.Listener
-func (a *Agent) Accept(ln net.Listener) error {
-	netConn, err := ln.Accept()
-	if err != nil {
-		return err
-	}
-
+// Serve serves a connection
+func (a *Agent) Serve(netConn net.Conn) error {
 	conn, err := NewConn(netConn, a.ConnConfig)
 	if err != nil {
 		a.Lager.Errorf("Error creating agent conn: %s", err)
@@ -91,8 +85,8 @@ func (a *Agent) Accept(ln net.Listener) error {
 	return nil
 }
 
-// IsShutdown returns a chan that determines whether we're shutdown
-func (a *Agent) IsShutdown() chan struct{} {
+// IsClosed return a chan determining if agent is closed or not
+func (a *Agent) IsClosed() chan struct{} {
 	return a.done
 }
 
@@ -111,7 +105,6 @@ func (a *Agent) Start() error {
 		syscall.SIGTERM,
 		syscall.SIGQUIT,
 		syscall.SIGKILL)
-	defer close(a.sigCh)
 
 	// TODO: We should also notify any running jobs
 	// Or, we can start a goroutine to update each connection when this happens?
@@ -124,17 +117,21 @@ func (a *Agent) Start() error {
 	}()
 
 	a.Lager.Debugf("Registering")
-	if err := a.registrator.Register(NewPort(a.port).Int(), a); err != nil {
+	if err := a.registrator.Register(NewPort(a.addr).Port(), a); err != nil {
 		a.Lager.Errorf("Failed to announce services: %s\n", err)
 		return err
 	}
 
 	// Blocks
-	a.Lager.Debugf("ListenAndServe block")
-	return quantum.ListenAndServe(a, a.port, a.Lager)
+	if a.ConnConfig.TLSConfig != nil {
+		a.Lager.Debugf("ListenAndServeTLS blocking")
+		return quantum.ListenAndServeTLS(a, a.addr, a.ConnConfig.TLSConfig, a.Lager)
+	}
+	a.Lager.Debugf("ListenAndServe blocking")
+	return quantum.ListenAndServe(a, a.addr, a.Lager)
 }
 
-// Port holds a port in the form :XXXX
+// Port holds a network address
 type Port struct {
 	Value string
 }
@@ -144,13 +141,11 @@ func NewPort(s string) Port {
 	return Port{Value: s}
 }
 
-// Int returns a int representation of Port
-func (p Port) Int() int {
-	number := p.Value[1:] // ignore : at [0]
-
-	i, err := strconv.Atoi(number)
+// Port returns a int representation of Port
+func (p Port) Port() int {
+	netAddr, err := net.ResolveTCPAddr("tcp", p.Value)
 	if err != nil {
 		return -1
 	}
-	return i
+	return netAddr.Port
 }

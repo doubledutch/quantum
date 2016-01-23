@@ -1,6 +1,7 @@
 package quantum
 
 import (
+	"crypto/tls"
 	"errors"
 	"time"
 
@@ -45,7 +46,8 @@ func DefaultConfig() *Config {
 
 // ConnConfig are configuration settings needed for Conn
 type ConnConfig struct {
-	Timeout time.Duration
+	Timeout   time.Duration
+	TLSConfig *tls.Config
 	*Config
 }
 

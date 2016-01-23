@@ -73,18 +73,22 @@ func listenTCP() (net.Listener, string) {
 }
 
 func TestClientAgent(t *testing.T) {
-	port := ":0"
+	addr := ":0"
 
 	agent := agent.New(&agent.Config{
-		Port: port,
+		Addr: addr,
 	})
 	agent.Add(new(testAgentJob))
 
 	l, agentAddr := listenTCP()
 	go func() {
-		if err := agent.Accept(l); err != nil {
+		conn, err := l.Accept()
+		if err != nil {
 			t.Fatal(err)
-			t.FailNow()
+		}
+
+		if err := agent.Serve(conn); err != nil {
+			t.Fatal(err)
 		}
 	}()
 

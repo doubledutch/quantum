@@ -9,7 +9,7 @@ import (
 
 // Agent routes job requests to jobs, and runs the jobs with the request
 type Agent interface {
-	Acceptor
+	Server
 	Registry
 	Start() error
 }
