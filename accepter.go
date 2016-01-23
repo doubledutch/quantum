@@ -25,14 +25,14 @@ type Acceptor interface {
 
 // ListenAndServe is a common function for listening on a port and accepting connections
 func ListenAndServe(a Acceptor, port string, lgr lager.Lager) error {
+	defer a.Close()
+
 	netaddr, err := net.ResolveTCPAddr("tcp", port)
 	if err != nil {
-		a.Close()
 		return ErrInvalidAddr
 	}
 	ln, err := net.ListenTCP("tcp", netaddr)
 	if err != nil {
-		a.Close()
 		return ErrListen
 	}
 	lgr.Infof("Listening on %s", port)
@@ -42,7 +42,6 @@ RECV_LOOP:
 		ln.SetDeadline(time.Now().Add(500 * time.Millisecond))
 		select {
 		case <-a.IsShutdown():
-			a.Close()
 			break RECV_LOOP
 		default:
 		}

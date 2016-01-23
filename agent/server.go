@@ -1,21 +1,14 @@
 package agent
 
 import (
-	"errors"
 	"net"
 	"os"
 	"os/signal"
-	"strconv"
 	"syscall"
 	"time"
 
 	"github.com/doubledutch/quantum"
 	"github.com/doubledutch/quantum/inmemory"
-)
-
-var (
-	// ErrUnexpectedError describes the error when a job panics
-	ErrUnexpectedError = errors.New("Job exited with unexpected error")
 )
 
 // Config encapsulates configuration for an agent
@@ -32,9 +25,10 @@ type Config struct {
 type Agent struct {
 	*quantum.ConnConfig
 
-	port  string
-	done  chan struct{}
-	sigCh chan os.Signal
+	port       string
+	done       chan struct{}
+	sigCh      chan os.Signal
+	isShutdown bool
 
 	quantum.Registry
 	registrator quantum.Registrator
@@ -96,8 +90,18 @@ func (a *Agent) IsShutdown() chan struct{} {
 	return a.done
 }
 
+func (a *Agent) shutdown() {
+	if a.isShutdown {
+		return
+	}
+	a.isShutdown = true
+	close(a.done)
+}
+
 // Close shutdowns an agent
 func (a *Agent) Close() error {
+	a.shutdown()
+	close(a.sigCh)
 	// Deregister services
 	return a.registrator.Deregister()
 }
@@ -111,15 +115,12 @@ func (a *Agent) Start() error {
 		syscall.SIGTERM,
 		syscall.SIGQUIT,
 		syscall.SIGKILL)
-	defer close(a.sigCh)
 
-	// TODO: We should also notify any running jobs
-	// Or, we can start a goroutine to update each connection when this happens?
 	go func() {
 		sig := <-a.sigCh
 		// If sig is nil, channel was closed
 		if sig != nil {
-			close(a.done)
+			a.shutdown()
 		}
 	}()
 
@@ -131,26 +132,6 @@ func (a *Agent) Start() error {
 
 	// Blocks
 	a.Lager.Debugf("ListenAndServe block")
+	// When agent shutdowns, ListenAndServe will Close the agents and return
 	return quantum.ListenAndServe(a, a.port, a.Lager)
-}
-
-// Port holds a port in the form :XXXX
-type Port struct {
-	Value string
-}
-
-// NewPort returns a Port
-func NewPort(s string) Port {
-	return Port{Value: s}
-}
-
-// Int returns a int representation of Port
-func (p Port) Int() int {
-	number := p.Value[1:] // ignore : at [0]
-
-	i, err := strconv.Atoi(number)
-	if err != nil {
-		return -1
-	}
-	return i
 }
